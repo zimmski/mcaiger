@@ -1,0 +1,34 @@
+These are the sources of our model checker McAiger 
+
+  http://fmv.jku.at/mcaiger
+
+for AIGER models
+
+  http://fmv.jku.at/aiger
+
+as used in the Hardware Model Checking Competition
+
+  http://fmv.jku.at/hwmcc
+
+McAiger is a simple model checker based on k-induction.  The only
+distinguishing feature is that by defaults it uses symbolic all-different
+constraints as described in the FMCAD'08 paper:
+
+  A. Biere, R. Brummayer.  Consistency Checking of All Different
+  Constraints over Bit-Vectors within a SAT-Solver.  In Proc. 8th
+  Intl. Conf. on Formal Methods in Computer-Aided Design (FMCAD'08),
+  IEEE 2008.
+
+Get PicoSAT, compile it with NADC undefined, otherwise you can not use
+symbolic all-different constraints ('-r' will still work though).
+
+You also need to get a copy of the AIGER library.  Unpack it
+at the same place and compile it.
+
+Then in the same directory where you unpacked PicoSAT and AIGER, unpack
+the McAiger sources and compile themwith 'make'.
+
+See LICENSE for more information on Copyright and Licensing.
+
+Armin Biere, Johannes Kepler University, Linz.
+Tue Aug 10 15:39:47 CEST 2010
