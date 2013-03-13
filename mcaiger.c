@@ -40,7 +40,10 @@ void picosat_set_ado_conflict_limit(unsigned limit);
 #define SAT PICOSAT_SATISFIABLE
 #define UNSAT PICOSAT_UNSATISFIABLE
 
+typedef PicoSAT PS;
+
 static aiger * model;
+static PS * ps;
 static int verbosity;
 static double start;
 
@@ -65,7 +68,7 @@ static void catch(int sig) {
 	fflush(stderr);
 
 	if (verbosity > 1)
-		picosat_stats();
+		picosat_stats(ps);
 
 	fflush(stderr);
 
@@ -143,26 +146,26 @@ static int output(unsigned k, unsigned i) {
 
 static void unary(int a) {
 	assert(a);
-	picosat_add(a);
-	picosat_add(0);
+	picosat_add(ps, a);
+	picosat_add(ps, 0);
 }
 
 static void binary(int a, int b) {
 	assert(a);
-	picosat_add(a);
+	picosat_add(ps, a);
 	assert(b);
-	picosat_add(b);
-	picosat_add(0);
+	picosat_add(ps, b);
+	picosat_add(ps, 0);
 }
 
 static void ternary(int a, int b, int c) {
 	assert(a);
-	picosat_add(a);
+	picosat_add(ps, a);
 	assert(b);
-	picosat_add(b);
+	picosat_add(ps, b);
 	assert(c);
-	picosat_add(c);
-	picosat_add(0);
+	picosat_add(ps, c);
+	picosat_add(ps, 0);
 }
 
 static void and(int lhs, int rhs0, int rhs1) {
@@ -177,7 +180,7 @@ static void eq(int lhs, int rhs) {
 }
 
 static void report(int verbosity, unsigned k, const char * phase) {
-	msg(verbosity, 1, "%4u %-10s %10d %11d %11u", k, phase, picosat_variables(), picosat_added_original_clauses(), picosat_ado_conflicts());
+	msg(verbosity, 1, "%4u %-10s %10d %11d %11u", k, phase, picosat_variables(ps), picosat_added_original_clauses(ps), picosat_ado_conflicts());
 }
 
 static void connect(unsigned k) {
@@ -206,9 +209,9 @@ static void encode(unsigned k) {
 
 	if (k) {
 		for (i = 0; i < model->num_latches; i++)
-			picosat_add(latch(k, i));
+			picosat_add(ps, latch(k, i));
 
-		picosat_add(0);
+		picosat_add(ps, 0);
 
 		unary(-output(k - 1, 0));
 	}
@@ -220,9 +223,9 @@ static void ado(unsigned k) {
 	unsigned i;
 
 	for (i = 0; i < model->num_latches; i++)
-		picosat_add_ado_lit(latch(k, i));
+		picosat_add_ado_lit(ps, latch(k, i));
 
-	picosat_add_ado_lit(0);
+	picosat_add_ado_lit(ps, 0);
 
 	report(2, k, "ado");
 }
@@ -250,9 +253,9 @@ static void diffs(unsigned k, unsigned l) {
 	}
 
 	for (i = 0; i < model->num_latches; i++)
-		picosat_add(diff(k, l, i));
+		picosat_add(ps, diff(k, l, i));
 
-	picosat_add(0);
+	picosat_add(ps, 0);
 
 	msg(2, 1, "diffs %u %u", l, k);
 }
@@ -284,7 +287,7 @@ static void stimulus(unsigned k) {
 
 	for (i = 0; i <= k; i++) {
 		for (j = 0; j < model->num_inputs; j++) {
-			tmp = picosat_deref(input(i, j));
+			tmp = picosat_deref(ps, input(i, j));
 			fputc(tmp ? ((tmp < 0) ? '0' : '1') : 'x', stdout);
 		}
 
@@ -294,7 +297,7 @@ static void stimulus(unsigned k) {
 
 static void bad(unsigned k) {
 	assert(model->num_outputs == 1);
-	picosat_assume(output(k, 0));
+	picosat_assume(ps, output(k, 0));
 	report(2, k, "bad");
 }
 
@@ -310,7 +313,7 @@ static void init(unsigned k) {
 		if (bonly)
 			unary(l);
 		else
-			picosat_assume(l);
+			picosat_assume(ps, l);
 	}
 
 	report(2, k, "init");
@@ -323,8 +326,8 @@ static int cmp_frames(const void * p, const void * q) {
 	unsigned i;
 
 	for (i = 0; i < model->num_latches; i++) {
-		a = picosat_deref(latch(k, i));
-		b = picosat_deref(latch(l, i));
+		a = picosat_deref(ps, latch(k, i));
+		b = picosat_deref(ps, latch(l, i));
 		res = a - b;
 		if (res)
 			return res;
@@ -353,7 +356,7 @@ static int sat(unsigned k) {
 		assert(nframes == k + 1);
 	}
 
-	RESTART: res = picosat_sat(-1);
+	RESTART: res = picosat_sat(ps, -1);
 
 	if (res == UNSAT)
 		return res;
@@ -508,12 +511,12 @@ int main(int argc, char ** argv) {
 
 	msg(1, 0, "%u literals (MILOA %u %u %u %u %u)", model->maxvar + 1, model->maxvar, model->num_inputs, model->num_latches, model->num_outputs, model->num_ands);
 
-	picosat_init();
+	ps = picosat_init();
 
 	catchall();
 
-	picosat_set_prefix("[picosat] ");
-	picosat_set_output(stderr);
+	picosat_set_prefix(ps, "[picosat] ");
+	picosat_set_output(ps, stderr);
 
 	if (verbosity > 2)
 		picosat_enable_verbosity();
@@ -538,7 +541,7 @@ int main(int argc, char ** argv) {
 			break;
 		}
 
-		if (bonly && picosat_inconsistent()) {
+		if (bonly && picosat_inconsistent(ps)) {
 			report(1, k, "inconsistent");
 			fputs("0\n", stdout);
 			res = 20;
@@ -563,9 +566,9 @@ int main(int argc, char ** argv) {
 	fflush(stdout);
 
 	if (verbosity > 1)
-		picosat_stats();
+		picosat_stats(ps);
 
-	picosat_reset();
+	picosat_reset(ps);
 	aiger_reset(model);
 
 	free(frames);
