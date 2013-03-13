@@ -23,10 +23,12 @@
 #include "../aiger/aiger.h"
 #include "../picosat/picosat.h"
 
-unsigned picosat_ado_conflicts(void);
-void picosat_disable_ado(void);
-void picosat_enable_ado(void);
-void picosat_set_ado_conflict_limit(unsigned limit);
+typedef PicoSAT PS;
+
+unsigned picosat_ado_conflicts(PS * ps);
+void picosat_disable_ado(PS * ps);
+void picosat_enable_ado(PS * ps);
+void picosat_set_ado_conflict_limit(PS * ps, unsigned limit);
 
 #include <stdio.h>
 #include <string.h>
@@ -39,8 +41,6 @@ void picosat_set_ado_conflict_limit(unsigned limit);
 
 #define SAT PICOSAT_SATISFIABLE
 #define UNSAT PICOSAT_UNSATISFIABLE
-
-typedef PicoSAT PS;
 
 static aiger * model;
 static PS * ps;
@@ -180,7 +180,7 @@ static void eq(int lhs, int rhs) {
 }
 
 static void report(int verbosity, unsigned k, const char * phase) {
-	msg(verbosity, 1, "%4u %-10s %10d %11d %11u", k, phase, picosat_variables(ps), picosat_added_original_clauses(ps), picosat_ado_conflicts());
+	msg(verbosity, 1, "%4u %-10s %10d %11d %11u", k, phase, picosat_variables(ps), picosat_added_original_clauses(ps), picosat_ado_conflicts(ps));
 }
 
 static void connect(unsigned k) {
@@ -370,7 +370,7 @@ static int sat(unsigned k) {
 		assert(acs);
 		rcs = 1;
 		acs = 0;
-		picosat_disable_ado();
+		picosat_disable_ado(ps);
 		goto RESTART;
 	}
 
@@ -394,7 +394,7 @@ static int sat(unsigned k) {
 static int step(unsigned k) {
 	int res;
 	if (mix && acs)
-		picosat_set_ado_conflict_limit(picosat_ado_conflicts() + 1000);
+		picosat_set_ado_conflict_limit(ps, picosat_ado_conflicts(ps) + 1000);
 	bad(k);
 	report(1, k, "step");
 	res = (sat(k) == UNSAT);
@@ -405,13 +405,13 @@ static int step(unsigned k) {
 static int base(unsigned k) {
 	int res;
 	if (acs)
-		picosat_disable_ado();
+		picosat_disable_ado(ps);
 	init(k);
 	bad(k);
 	report(1, k, "base");
 	res = (sat(k) == SAT);
 	if (acs)
-		picosat_enable_ado();
+		picosat_enable_ado(ps);
 	return res;
 }
 
@@ -519,15 +519,15 @@ int main(int argc, char ** argv) {
 	picosat_set_output(ps, stderr);
 
 	if (verbosity > 2)
-		picosat_enable_verbosity();
+		picosat_set_verbosity(ps, 1);
 
 	res = 0;
 	for (k = 0; k <= maxk; k++) {
 
-		if (mix && acs && picosat_ado_conflicts() >= 10000) {
+		if (mix && acs && picosat_ado_conflicts(ps) >= 10000) {
 			acs = 0;
 			rcs = 1;
-			picosat_disable_ado();
+			picosat_disable_ado(ps);
 		}
 
 		connect(k);
